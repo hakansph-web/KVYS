@@ -1,0 +1,251 @@
+@page "/reports/program"
+@attribute [Authorize]
+@using KVYS.Web.Models
+@inject ApiClient Api
+
+<PageTitle>Program Raporu - KVYS</PageTitle>
+
+<div class="flex justify-between items-center mb-lg">
+    <div>
+        <h1 class="page-title m-0">Program Raporu</h1>
+        <p class="text-secondary text-sm">Program ciktilari kapsam ve katki analizi</p>
+    </div>
+</div>
+
+<div class="card mb-lg">
+    <div class="card-body">
+        <div class="grid grid-cols-3 gap-md">
+            <div class="form-group m-0">
+                <label class="form-label">Program</label>
+                <select class="form-select" @bind="selectedProgramId" @bind:after="LoadReport">
+                    <option value="">Program secin</option>
+                    @if (programs != null)
+                    {
+                        @foreach (var program in programs)
+                        {
+                            <option value="@program.Id">@program.Code - @program.Name</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="form-group m-0">
+                <label class="form-label">Akademik Yil</label>
+                <select class="form-select" @bind="selectedYear" @bind:after="LoadReport">
+                    <option value="2024-2025">2024-2025</option>
+                    <option value="2023-2024">2023-2024</option>
+                    <option value="2022-2023">2022-2023</option>
+                </select>
+            </div>
+            <div class="form-group m-0 flex items-end">
+                <button class="btn btn-secondary" @onclick="ExportReport" disabled="@(report == null)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                    </svg>
+                    Disa Aktar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (isLoading)
+{
+    <div class="card">
+        <div class="card-body">
+            <div class="flex items-center justify-center p-lg">
+                <div class="spinner"></div>
+            </div>
+        </div>
+    </div>
+}
+else if (selectedProgramId == null)
+{
+    <div class="card">
+        <div class="card-body">
+            <div class="empty-state">
+                <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
+                    <path d="M6 12v5c3 3 9 3 12 0v-5"/>
+                </svg>
+                <h3 class="empty-state-title">Program secin</h3>
+                <p class="empty-state-description">Raporu goruntulemek icin bir program secin.</p>
+            </div>
+        </div>
+    </div>
+}
+else if (report == null)
+{
+    <div class="card">
+        <div class="card-body">
+            <div class="empty-state">
+                <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z"/>
+                </svg>
+                <h3 class="empty-state-title">Rapor bulunamadi</h3>
+                <p class="empty-state-description">Secilen program ve akademik yil icin rapor verisi bulunmamaktadir.</p>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="grid grid-cols-2 gap-lg">
+        <!-- PO Coverage -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Program Ciktilari Kapsami</h3>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>PO</th>
+                                <th>Aciklama</th>
+                                <th>Ders Sayisi</th>
+                                <th>Kapsam</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var po in report.OutcomeCoverage)
+                            {
+                                <tr>
+                                    <td><code>@po.Code</code></td>
+                                    <td class="text-sm" title="@po.Description">
+                                        <div class="text-truncate" style="max-width: 200px;">@po.Description</div>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge badge-primary">@po.ContributingCourseCount</span>
+                                    </td>
+                                    <td>
+                                        <div class="flex items-center gap-sm">
+                                            <div class="progress-bar-sm" style="flex: 1;">
+                                                <div class="progress-fill-sm @GetCoverageClass(po.CoveragePercentage)"
+                                                     style="width: @po.CoveragePercentage%"></div>
+                                            </div>
+                                            <span class="text-sm font-medium" style="width: 45px;">
+                                                %@po.CoveragePercentage.ToString("F0")
+                                            </span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contributing Courses -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Katki Saglayan Dersler</h3>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Kod</th>
+                                <th>Ders Adi</th>
+                                <th>OC</th>
+                                <th>Katkili PO</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var course in report.ContributingCourses)
+                            {
+                                <tr>
+                                    <td><code>@course.CourseCode</code></td>
+                                    <td class="font-medium">@course.CourseName</td>
+                                    <td class="text-center">
+                                        <span class="badge badge-info">@course.LoCount</span>
+                                    </td>
+                                    <td>
+                                        @foreach (var po in course.ContributedPOs)
+                                        {
+                                            <span class="badge badge-success" style="margin-right: 4px;">@po</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .progress-bar-sm {
+        height: 6px;
+        background: var(--bg-secondary);
+        border-radius: 3px;
+        overflow: hidden;
+    }
+    .progress-fill-sm {
+        height: 100%;
+        transition: width 0.3s ease;
+    }
+    .progress-fill-sm.coverage-low { background: var(--danger); }
+    .progress-fill-sm.coverage-medium { background: var(--warning); }
+    .progress-fill-sm.coverage-high { background: var(--success); }
+</style>
+
+@code {
+    private Guid? selectedProgramId;
+    private string selectedYear = "2024-2025";
+    private List<ProgramDto>? programs;
+    private ProgramReportDto? report;
+    private bool isLoading = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPrograms();
+    }
+
+    private async Task LoadPrograms()
+    {
+        try
+        {
+            programs = await Api.GetAsync<List<ProgramDto>>("api/v1/programs");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading programs: {ex.Message}");
+        }
+    }
+
+    private async Task LoadReport()
+    {
+        if (selectedProgramId == null) return;
+
+        isLoading = true;
+        try
+        {
+            report = await Api.GetAsync<ProgramReportDto>($"api/v1/reports/program/{selectedProgramId}?year={selectedYear}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading program report: {ex.Message}");
+            report = null;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ExportReport()
+    {
+        // TODO: Implement export functionality
+    }
+
+    private string GetCoverageClass(decimal percentage)
+    {
+        if (percentage < 33) return "coverage-low";
+        if (percentage < 66) return "coverage-medium";
+        return "coverage-high";
+    }
+}

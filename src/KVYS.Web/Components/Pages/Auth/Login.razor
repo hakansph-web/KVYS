@@ -1,0 +1,123 @@
+@page "/login"
+@layout EmptyLayout
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Giris - KVYS</PageTitle>
+
+<div class="login-page">
+    <div class="login-card">
+        <div class="login-header">
+            <h1 class="login-logo">KVYS</h1>
+            <p class="login-subtitle">Kalite Veri Yonetim Sistemi</p>
+        </div>
+
+        <div class="login-body">
+            <EditForm Model="@loginModel" OnValidSubmit="HandleLogin" FormName="login">
+                <DataAnnotationsValidator />
+
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="alert alert-danger mb-lg">
+                        <svg class="alert-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <line x1="12" y1="8" x2="12" y2="12"/>
+                            <line x1="12" y1="16" x2="12.01" y2="16"/>
+                        </svg>
+                        <div class="alert-content">@errorMessage</div>
+                    </div>
+                }
+
+                <div class="form-group">
+                    <label class="form-label required" for="email">E-posta</label>
+                    <InputText id="email" class="form-input" @bind-Value="loginModel.Email"
+                               placeholder="ornek@universite.edu.tr" />
+                    <ValidationMessage For="@(() => loginModel.Email)" class="form-error" />
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label required" for="password">Sifre</label>
+                    <InputText id="password" type="password" class="form-input" @bind-Value="loginModel.Password"
+                               placeholder="Sifrenizi girin" />
+                    <ValidationMessage For="@(() => loginModel.Password)" class="form-error" />
+                </div>
+
+                <div class="form-group">
+                    <label class="form-check">
+                        <InputCheckbox class="form-check-input" @bind-Value="loginModel.RememberMe" />
+                        <span class="form-check-label">Beni hatirla</span>
+                    </label>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-lg" style="width: 100%;" disabled="@isLoading">
+                    @if (isLoading)
+                    {
+                        <span class="spinner spinner-sm"></span>
+                        <span>Giris yapiliyor...</span>
+                    }
+                    else
+                    {
+                        <span>Giris Yap</span>
+                    }
+                </button>
+            </EditForm>
+        </div>
+
+        <div class="login-footer">
+            <p>YOKAK Kalite Guvence Sistemi</p>
+        </div>
+    </div>
+</div>
+
+@code {
+    private LoginModel loginModel = new();
+    private string? errorMessage;
+    private bool isLoading = false;
+
+    [SupplyParameterFromQuery]
+    public string? ReturnUrl { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = await AuthService.GetCurrentUserAsync();
+        if (user != null)
+        {
+            Navigation.NavigateTo(ReturnUrl ?? "/");
+        }
+    }
+
+    private async Task HandleLogin()
+    {
+        errorMessage = null;
+        isLoading = true;
+
+        try
+        {
+            var result = await AuthService.LoginAsync(loginModel.Email, loginModel.Password);
+
+            if (result.Success)
+            {
+                Navigation.NavigateTo(ReturnUrl ?? "/", forceLoad: true);
+            }
+            else
+            {
+                errorMessage = result.ErrorMessage ?? "Giris basarisiz. Lutfen bilgilerinizi kontrol edin.";
+            }
+        }
+        catch (Exception)
+        {
+            errorMessage = "Bir hata olustu. Lutfen tekrar deneyin.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private class LoginModel
+    {
+        public string Email { get; set; } = "";
+        public string Password { get; set; } = "";
+        public bool RememberMe { get; set; } = false;
+    }
+}

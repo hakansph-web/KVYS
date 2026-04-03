@@ -1,0 +1,116 @@
+@namespace KVYS.Web.Components.Shared
+@using KVYS.Web.Models
+
+<div class="tree-node">
+    <div class="tree-item @(SelectedId == Category.Id ? "selected" : "")" @onclick="() => OnSelect.InvokeAsync(Category)">
+        @if (Category.Children?.Any() == true)
+        {
+            <button class="tree-toggle" @onclick="HandleToggle" @onclick:stopPropagation="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                     class="@(IsExpanded ? "rotated" : "")">
+                    <path d="M9 18l6-6-6-6"/>
+                </svg>
+            </button>
+        }
+        else
+        {
+            <span class="tree-toggle-placeholder"></span>
+        }
+        <svg class="tree-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            @if (Category.Children?.Any() == true)
+            {
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+            }
+            else
+            {
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+            }
+        </svg>
+        <span class="tree-label">@Category.Name</span>
+        <span class="badge badge-sm badge-secondary ml-auto">@Category.IndicatorCount</span>
+    </div>
+    @if (IsExpanded && Category.Children?.Any() == true)
+    {
+        <div class="tree-children">
+            @foreach (var child in Category.Children)
+            {
+                <CategoryTreeNode Category="child" ExpandedIds="ExpandedIds" OnToggle="OnToggle" OnSelect="OnSelect" SelectedId="SelectedId" />
+            }
+        </div>
+    }
+</div>
+
+<style>
+    .tree-node {
+        user-select: none;
+    }
+    .tree-item {
+        display: flex;
+        align-items: center;
+        padding: 8px 12px;
+        gap: 8px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background-color 0.15s;
+    }
+    .tree-item:hover {
+        background: var(--bg-secondary);
+    }
+    .tree-item.selected {
+        background: rgba(5, 150, 105, 0.1);
+        color: var(--primary);
+    }
+    .tree-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+        border: none;
+        background: none;
+        padding: 0;
+        cursor: pointer;
+        color: var(--text-secondary);
+        transition: transform 0.15s;
+    }
+    .tree-toggle svg.rotated {
+        transform: rotate(90deg);
+    }
+    .tree-toggle-placeholder {
+        width: 20px;
+        height: 20px;
+    }
+    .tree-icon {
+        color: var(--text-secondary);
+        flex-shrink: 0;
+    }
+    .tree-label {
+        flex: 1;
+        font-size: 14px;
+    }
+    .tree-children {
+        margin-left: 28px;
+        border-left: 1px solid var(--border-color);
+        padding-left: 8px;
+    }
+    .badge-sm {
+        font-size: 11px;
+        padding: 2px 6px;
+    }
+</style>
+
+@code {
+    [Parameter] public IndicatorCategoryDto Category { get; set; } = default!;
+    [Parameter] public HashSet<Guid> ExpandedIds { get; set; } = new();
+    [Parameter] public EventCallback<Guid> OnToggle { get; set; }
+    [Parameter] public EventCallback<IndicatorCategoryDto> OnSelect { get; set; }
+    [Parameter] public Guid? SelectedId { get; set; }
+
+    private bool IsExpanded => ExpandedIds.Contains(Category.Id);
+
+    private async Task HandleToggle()
+    {
+        await OnToggle.InvokeAsync(Category.Id);
+    }
+}

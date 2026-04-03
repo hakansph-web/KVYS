@@ -1,0 +1,269 @@
+@page "/courses/{CourseId:guid}/instances/{InstanceId:guid}"
+@attribute [Authorize]
+@using KVYS.Web.Components.Shared
+@using KVYS.Web.Models
+@inject ApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>@(instance?.CourseName ?? "Ders Acilimi") - KVYS</PageTitle>
+
+<div class="breadcrumb mb-md">
+    <a href="/courses" class="breadcrumb-item">Dersler</a>
+    <span class="breadcrumb-separator">/</span>
+    <a href="/courses/@CourseId" class="breadcrumb-item">@instance?.CourseCode</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-current">@instance?.AcademicYear @instance?.Semester</span>
+</div>
+
+@if (isLoading)
+{
+    <div class="card">
+        <div class="card-body">
+            <div class="flex items-center justify-center p-lg">
+                <div class="spinner"></div>
+            </div>
+        </div>
+    </div>
+}
+else if (instance == null)
+{
+    <div class="alert alert-danger">
+        <div class="alert-content">Ders acilimi bulunamadi.</div>
+    </div>
+}
+else
+{
+    <div class="card mb-lg">
+        <div class="card-body">
+            <div class="grid grid-cols-4 gap-lg">
+                <div>
+                    <div class="text-sm text-secondary mb-xs">Ders</div>
+                    <div class="font-medium">@instance.CourseCode - @instance.CourseName</div>
+                </div>
+                <div>
+                    <div class="text-sm text-secondary mb-xs">Akademik Yil</div>
+                    <div class="font-medium">@instance.AcademicYear</div>
+                </div>
+                <div>
+                    <div class="text-sm text-secondary mb-xs">Donem</div>
+                    <div class="font-medium">@instance.Semester</div>
+                </div>
+                <div>
+                    <div class="text-sm text-secondary mb-xs">Ogretim Uyesi</div>
+                    <div class="font-medium">@(instance.InstructorName ?? "-")</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="tabs">
+        <button class="tab @(activeTab == "outcomes" ? "active" : "")" @onclick="SetOutcomesTab">
+            Ogrenme Ciktilari (@(learningOutcomes?.Count ?? 0))
+        </button>
+        <button class="tab @(activeTab == "exams" ? "active" : "")" @onclick="SetExamsTab">
+            Sinavlar (@(exams?.Count ?? 0))
+        </button>
+        <button class="tab @(activeTab == "matrix" ? "active" : "")" @onclick="SetMatrixTab">
+            OC-PC Matrisi
+        </button>
+    </div>
+
+    @if (activeTab == "outcomes")
+    {
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Ogrenme Ciktilari (OC)</h3>
+            </div>
+            @if (learningOutcomes == null || !learningOutcomes.Any())
+            {
+                <div class="card-body">
+                    <div class="empty-state">
+                        <h3 class="empty-state-title">Henuz ogrenme ciktisi eklenmemis</h3>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 80px;">Kod</th>
+                                <th>Aciklama</th>
+                                <th style="width: 120px;">Bloom Seviyesi</th>
+                                <th style="width: 150px;">PC Iliskileri</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var lo in learningOutcomes)
+                            {
+                                <tr>
+                                    <td><code>@lo.Code</code></td>
+                                    <td>@lo.Description</td>
+                                    <td>
+                                        <span class="badge @GetBloomBadgeClass(lo.BloomLevel)">@lo.BloomLevel</span>
+                                    </td>
+                                    <td>
+                                        @if (lo.MappedPOs?.Any() == true)
+                                        {
+                                            @foreach (var po in lo.MappedPOs)
+                                            {
+                                                <span class="badge badge-primary" style="margin-right: 4px;">@po</span>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    }
+
+    @if (activeTab == "exams")
+    {
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Sinavlar</h3>
+            </div>
+            @if (exams == null || !exams.Any())
+            {
+                <div class="card-body">
+                    <div class="empty-state">
+                        <h3 class="empty-state-title">Henuz sinav eklenmemis</h3>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Sinav Adi</th>
+                                <th>Tur</th>
+                                <th>Tarih</th>
+                                <th>Soru Sayisi</th>
+                                <th>Toplam Puan</th>
+                                <th>Agirlik (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var exam in exams)
+                            {
+                                <tr>
+                                    <td class="font-medium">@exam.Name</td>
+                                    <td>
+                                        <span class="badge @GetExamTypeBadgeClass(exam.Type)">@exam.Type</span>
+                                    </td>
+                                    <td>@exam.Date?.ToString("dd.MM.yyyy")</td>
+                                    <td class="text-center">@exam.QuestionCount</td>
+                                    <td class="text-center">@exam.TotalPoints</td>
+                                    <td class="text-center">%@exam.Weight</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    }
+
+    @if (activeTab == "matrix")
+    {
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Ogrenme Ciktisi - Program Ciktisi Matrisi</h3>
+            </div>
+            <div class="card-body">
+                @if (learningOutcomes == null || !learningOutcomes.Any() || programOutcomes == null || !programOutcomes.Any())
+                {
+                    <div class="empty-state">
+                        <h3 class="empty-state-title">Matris olusturulamadi</h3>
+                        <p class="empty-state-description">Ogrenme ciktilari veya program ciktilari tanimlanmamis.</p>
+                    </div>
+                }
+                else
+                {
+                    <LOPOMatrix LearningOutcomes="@learningOutcomes" ProgramOutcomes="@programOutcomes" />
+                }
+            </div>
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public Guid CourseId { get; set; }
+    [Parameter] public Guid InstanceId { get; set; }
+
+    private CourseInstanceDto? instance;
+    private List<LearningOutcomeDto>? learningOutcomes;
+    private List<ExamDto>? exams;
+    private List<ProgramOutcomeDto>? programOutcomes;
+    private bool isLoading = true;
+    private string activeTab = "outcomes";
+
+    private void SetOutcomesTab() => activeTab = "outcomes";
+    private void SetExamsTab() => activeTab = "exams";
+    private void SetMatrixTab() => activeTab = "matrix";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        try
+        {
+            var instanceTask = Api.GetAsync<CourseInstanceDto>($"api/v1/courses/{CourseId}/instances/{InstanceId}");
+            var losTask = Api.GetAsync<List<LearningOutcomeDto>>($"api/v1/courses/{CourseId}/instances/{InstanceId}/learning-outcomes");
+            var examsTask = Api.GetAsync<List<ExamDto>>($"api/v1/courses/{CourseId}/instances/{InstanceId}/exams");
+
+            await Task.WhenAll(instanceTask, losTask, examsTask);
+
+            instance = await instanceTask;
+            learningOutcomes = await losTask;
+            exams = await examsTask;
+
+            if (instance != null)
+            {
+                programOutcomes = await Api.GetAsync<List<ProgramOutcomeDto>>($"api/v1/programs/{instance.ProgramId}/outcomes");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading data: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private string GetBloomBadgeClass(string level) => level switch
+    {
+        "Hatırlama" or "Hatirlama" => "badge-secondary",
+        "Anlama" => "badge-info",
+        "Uygulama" => "badge-primary",
+        "Analiz" => "badge-warning",
+        "Degerlendirme" or "Değerlendirme" => "badge-danger",
+        "Yaratma" => "badge-success",
+        _ => "badge-secondary"
+    };
+
+    private string GetExamTypeBadgeClass(string type) => type switch
+    {
+        "Vize" or "Midterm" => "badge-info",
+        "Final" => "badge-primary",
+        "Quiz" or "Kisa Sinav" => "badge-warning",
+        "Odev" or "Proje" => "badge-secondary",
+        _ => "badge-secondary"
+    };
+}

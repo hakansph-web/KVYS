@@ -1,9 +1,166 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+@inject KVYS.Web.Services.AuthService AuthService
 
-@Body
+<div class="app-layout">
+    <AuthorizeView>
+        <Authorized>
+            <aside class="sidebar @(sidebarOpen ? "open" : "")">
+                <div class="sidebar-header">
+                    <div class="sidebar-logo">
+                        <div class="sidebar-logo-icon">K</div>
+                        <span>KVYS</span>
+                    </div>
+                </div>
+
+                <nav class="sidebar-nav">
+                    <NavMenu />
+                </nav>
+
+                <div class="sidebar-footer">
+                    <div class="user-menu" @onclick="ToggleUserMenu">
+                        <div class="user-avatar">@GetUserInitials()</div>
+                        <div class="user-info">
+                            <div class="user-name">@currentUser?.Name</div>
+                            <div class="user-role">@currentUser?.Role</div>
+                        </div>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 9l6 6 6-6"/>
+                        </svg>
+                    </div>
+                    @if (showUserMenu)
+                    {
+                        <div class="user-dropdown">
+                            <button class="user-dropdown-item" @onclick="HandleLogout">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                                    <polyline points="16,17 21,12 16,7"/>
+                                    <line x1="21" y1="12" x2="9" y2="12"/>
+                                </svg>
+                                <span>Logout</span>
+                            </button>
+                        </div>
+                    }
+                </div>
+            </aside>
+
+            <main class="main-content">
+                <header class="content-header">
+                    <button class="btn btn-ghost mobile-menu-toggle" @onclick="ToggleSidebar">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="3" y1="12" x2="21" y2="12"/>
+                            <line x1="3" y1="6" x2="21" y2="6"/>
+                            <line x1="3" y1="18" x2="21" y2="18"/>
+                        </svg>
+                    </button>
+                    <h1 class="page-title">@pageTitle</h1>
+                    <div class="header-actions">
+                        <!-- Header actions can be added here -->
+                    </div>
+                </header>
+
+                <div class="content-body">
+                    @Body
+                </div>
+            </main>
+        </Authorized>
+
+        <NotAuthorized>
+            @Body
+        </NotAuthorized>
+    </AuthorizeView>
+</div>
+
+<div class="toast-container" id="toast-container">
+    <!-- Toasts will be rendered here -->
+</div>
 
 <div id="blazor-error-ui">
     An unhandled error has occurred.
     <a href="" class="reload">Reload</a>
-    <a class="dismiss">🗙</a>
+    <a class="dismiss">X</a>
 </div>
+
+<style>
+    .user-dropdown {
+        position: absolute;
+        bottom: 100%;
+        left: var(--space-md);
+        right: var(--space-md);
+        background: var(--bg-card);
+        border-radius: var(--border-radius);
+        box-shadow: var(--shadow-lg);
+        padding: var(--space-xs);
+        margin-bottom: var(--space-sm);
+    }
+
+    .user-dropdown-item {
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+        width: 100%;
+        padding: var(--space-sm) var(--space-md);
+        background: none;
+        border: none;
+        border-radius: var(--border-radius-sm);
+        color: var(--text-primary);
+        font-size: var(--text-sm);
+        cursor: pointer;
+        transition: background var(--transition-fast);
+    }
+
+    .user-dropdown-item:hover {
+        background: var(--bg-muted);
+    }
+
+    .sidebar-footer {
+        position: relative;
+    }
+</style>
+
+@code {
+    private bool sidebarOpen = false;
+    private bool showUserMenu = false;
+    private string pageTitle = "Dashboard";
+    private KVYS.Web.Services.UserInfo? currentUser;
+
+    protected override async Task OnInitializedAsync()
+    {
+        currentUser = await AuthService.GetCurrentUserAsync();
+    }
+
+    private void ToggleSidebar()
+    {
+        sidebarOpen = !sidebarOpen;
+    }
+
+    private void ToggleUserMenu()
+    {
+        showUserMenu = !showUserMenu;
+    }
+
+    private string GetUserInitials()
+    {
+        if (currentUser == null || string.IsNullOrEmpty(currentUser.Name))
+            return "?";
+
+        var parts = currentUser.Name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 2)
+            return $"{parts[0][0]}{parts[1][0]}".ToUpper();
+        return parts[0][0].ToString().ToUpper();
+    }
+
+    private async Task HandleLogout()
+    {
+        await AuthService.LogoutAsync();
+        Navigation.NavigateTo("/login", forceLoad: true);
+    }
+
+    public void SetPageTitle(string title)
+    {
+        pageTitle = title;
+        StateHasChanged();
+    }
+}

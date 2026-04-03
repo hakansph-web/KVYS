@@ -1,7 +1,213 @@
-﻿@page "/"
+@page "/"
+@attribute [Authorize]
+@inject ApiClient Api
+@inject NavigationManager Navigation
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Dashboard - KVYS</PageTitle>
 
-<h1>Hello, world!</h1>
+<div class="dashboard-header">
+    <h1 class="dashboard-title">Dashboard</h1>
+    <p class="dashboard-subtitle">@currentAcademicYear Akademik Yili Genel Bakis</p>
+</div>
 
-Welcome to your new app.
+@if (isLoading)
+{
+    <div class="dashboard-stats">
+        @for (int i = 0; i < 4; i++)
+        {
+            <div class="stat-card">
+                <div class="skeleton" style="width: 48px; height: 48px;"></div>
+                <div class="stat-content">
+                    <div class="skeleton" style="width: 80px; height: 16px; margin-bottom: 8px;"></div>
+                    <div class="skeleton" style="width: 60px; height: 32px;"></div>
+                </div>
+            </div>
+        }
+    </div>
+}
+else if (dashboard != null)
+{
+    <div class="dashboard-stats">
+        <div class="stat-card">
+            <div class="stat-icon primary">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
+                    <path d="M6 12v5c3 3 9 3 12 0v-5"/>
+                </svg>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Aktif Programlar</div>
+                <div class="stat-value">@dashboard.Education?.Programs</div>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon accent">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                </svg>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Aktif Dersler</div>
+                <div class="stat-value">@dashboard.Education?.Courses</div>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon info">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 20V10"/>
+                    <path d="M18 20V4"/>
+                    <path d="M6 20v-4"/>
+                </svg>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Toplam Gosterge</div>
+                <div class="stat-value">@dashboard.QualityIndicators?.TotalIndicators</div>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon warning">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                    <line x1="16" y1="2" x2="16" y2="6"/>
+                    <line x1="8" y1="2" x2="8" y2="6"/>
+                    <line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Ders Acilimlari</div>
+                <div class="stat-value">@dashboard.Education?.ActiveInstances</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-2 mt-lg">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Gosterge Durumlari</h3>
+            </div>
+            <div class="card-body">
+                <div class="flex flex-col gap-md">
+                    <div class="flex justify-between items-center">
+                        <span>Taslak</span>
+                        <span class="badge badge-draft">@dashboard.QualityIndicators?.Entries?.Draft</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span>Gonderildi</span>
+                        <span class="badge badge-submitted">@dashboard.QualityIndicators?.Entries?.Submitted</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span>Onaylandi</span>
+                        <span class="badge badge-approved">@dashboard.QualityIndicators?.Entries?.Approved</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span>Revizyon Gerekli</span>
+                        <span class="badge badge-needs-revision">@dashboard.QualityIndicators?.Entries?.NeedsRevision</span>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer">
+                <a href="/indicators/entries" class="btn btn-secondary btn-sm">Tum Girisler</a>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Hizli Erisim</h3>
+            </div>
+            <div class="card-body">
+                <div class="grid grid-cols-2 gap-sm">
+                    <a href="/indicators/entries" class="btn btn-primary">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 5v14"/>
+                            <path d="M5 12h14"/>
+                        </svg>
+                        Veri Girisi
+                    </a>
+                    <a href="/reports/kidr" class="btn btn-secondary">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14,2 14,8 20,8"/>
+                        </svg>
+                        KIDR Raporu
+                    </a>
+                    <a href="/programs" class="btn btn-secondary">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
+                        </svg>
+                        Programlar
+                    </a>
+                    <a href="/courses" class="btn btn-secondary">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                        </svg>
+                        Dersler
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+else if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">
+        <svg class="alert-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <div class="alert-content">
+            <div class="alert-title">Hata</div>
+            <p>@errorMessage</p>
+        </div>
+    </div>
+}
+
+@code {
+    private DashboardResponse? dashboard;
+    private bool isLoading = true;
+    private string? errorMessage;
+    private string currentAcademicYear = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        currentAcademicYear = GetCurrentAcademicYear();
+
+        try
+        {
+            dashboard = await Api.GetAsync<DashboardResponse>($"api/v1/reports/dashboard?academicYear={currentAcademicYear}");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Dashboard verileri yuklenemedi: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private static string GetCurrentAcademicYear()
+    {
+        var now = DateTime.Now;
+        var year = now.Month >= 9 ? now.Year : now.Year - 1;
+        return $"{year}-{year + 1}";
+    }
+
+    private record DashboardResponse(
+        string AcademicYear,
+        DateTime GeneratedAt,
+        EducationStats? Education,
+        QualityIndicatorStats? QualityIndicators
+    );
+
+    private record EducationStats(int Programs, int Courses, int ActiveInstances);
+
+    private record QualityIndicatorStats(int TotalIndicators, EntryStats? Entries);
+
+    private record EntryStats(int Draft, int Submitted, int Approved, int NeedsRevision);
+}

@@ -1,0 +1,288 @@
+@page "/indicators/entries"
+@attribute [Authorize]
+@using KVYS.Web.Models
+@inject ApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>Veri Girisleri - KVYS</PageTitle>
+
+<div class="flex justify-between items-center mb-lg">
+    <div>
+        <h1 class="page-title m-0">Veri Girisleri</h1>
+        <p class="text-secondary text-sm">Gosterge veri girisi ve onay sureci</p>
+    </div>
+    <a href="/indicators/entries/new" class="btn btn-primary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 5v14M5 12h14"/>
+        </svg>
+        Yeni Giris
+    </a>
+</div>
+
+<div class="card mb-lg">
+    <div class="card-body">
+        <div class="grid grid-cols-5 gap-md">
+            <div class="form-group m-0">
+                <label class="form-label">Gosterge</label>
+                <select class="form-select" @bind="selectedIndicatorId">
+                    <option value="">Tum Gostergeler</option>
+                    @if (indicators != null)
+                    {
+                        @foreach (var indicator in indicators)
+                        {
+                            <option value="@indicator.Id">@indicator.Code - @indicator.Name</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="form-group m-0">
+                <label class="form-label">Birim</label>
+                <select class="form-select" @bind="selectedUnitId">
+                    <option value="">Tum Birimler</option>
+                    @if (units != null)
+                    {
+                        @foreach (var unit in units)
+                        {
+                            <option value="@unit.Id">@unit.Name</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="form-group m-0">
+                <label class="form-label">Akademik Yil</label>
+                <select class="form-select" @bind="selectedYear">
+                    <option value="">Tum Yillar</option>
+                    <option value="2024-2025">2024-2025</option>
+                    <option value="2023-2024">2023-2024</option>
+                    <option value="2022-2023">2022-2023</option>
+                </select>
+            </div>
+            <div class="form-group m-0">
+                <label class="form-label">Durum</label>
+                <select class="form-select" @bind="selectedStatus">
+                    <option value="">Tum Durumlar</option>
+                    <option value="Draft">Taslak</option>
+                    <option value="Submitted">Gonderildi</option>
+                    <option value="Approved">Onaylandi</option>
+                    <option value="Rejected">Reddedildi</option>
+                </select>
+            </div>
+            <div class="form-group m-0">
+                <label class="form-label">Ara</label>
+                <input type="text" class="form-input" placeholder="Ara..." @bind="searchTerm" @bind:event="oninput" />
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (isLoading)
+{
+    <div class="card">
+        <div class="card-body">
+            <div class="flex items-center justify-center p-lg">
+                <div class="spinner"></div>
+            </div>
+        </div>
+    </div>
+}
+else if (filteredEntries == null || !filteredEntries.Any())
+{
+    <div class="card">
+        <div class="card-body">
+            <div class="empty-state">
+                <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2"/>
+                </svg>
+                <h3 class="empty-state-title">Veri girisi bulunamadi</h3>
+                <p class="empty-state-description">Secilen kriterlere uygun veri girisi bulunmamaktadir.</p>
+                <a href="/indicators/entries/new" class="btn btn-primary">Yeni Giris Olustur</a>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="card-header">
+            <span class="text-sm text-secondary">@filteredEntries.Count() kayit listeleniyor</span>
+        </div>
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Gosterge</th>
+                        <th>Birim</th>
+                        <th>Akademik Yil</th>
+                        <th>Deger</th>
+                        <th>Durum</th>
+                        <th>Olusturulma</th>
+                        <th style="width: 120px;">Islemler</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var entry in filteredEntries)
+                    {
+                        <tr>
+                            <td>
+                                <div class="font-medium">@entry.IndicatorCode</div>
+                                <div class="text-sm text-secondary">@entry.IndicatorName</div>
+                            </td>
+                            <td>@entry.UnitName</td>
+                            <td>@entry.AcademicYear</td>
+                            <td>
+                                @if (entry.NumericValue.HasValue)
+                                {
+                                    <span class="font-medium">@entry.NumericValue</span>
+                                }
+                                else if (!string.IsNullOrEmpty(entry.TextValue))
+                                {
+                                    <span class="text-truncate" style="max-width: 150px;">@entry.TextValue</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">-</span>
+                                }
+                            </td>
+                            <td>
+                                <span class="badge @GetStatusBadgeClass(entry.Status)">
+                                    @GetStatusDisplay(entry.Status)
+                                </span>
+                            </td>
+                            <td>
+                                <div class="text-sm">@entry.CreatedAt.ToString("dd.MM.yyyy")</div>
+                                @if (!string.IsNullOrEmpty(entry.CreatedByName))
+                                {
+                                    <div class="text-xs text-secondary">@entry.CreatedByName</div>
+                                }
+                            </td>
+                            <td>
+                                <div class="table-actions">
+                                    <a href="/indicators/entries/@entry.Id" class="btn btn-ghost btn-sm btn-icon" title="Duzenle">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                        </svg>
+                                    </a>
+                                    @if (entry.Status == "Draft")
+                                    {
+                                        <button class="btn btn-ghost btn-sm btn-icon" title="Gonder" @onclick="() => SubmitEntry(entry.Id)">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                                            </svg>
+                                        </button>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    [SupplyParameterFromQuery]
+    public Guid? indicator { get; set; }
+
+    private List<IndicatorEntryDto>? entries;
+    private List<IndicatorDto>? indicators;
+    private List<UnitDto>? units;
+    private bool isLoading = true;
+
+    private Guid? selectedIndicatorId;
+    private Guid? selectedUnitId;
+    private string? selectedYear;
+    private string? selectedStatus;
+    private string? searchTerm;
+
+    private IEnumerable<IndicatorEntryDto>? filteredEntries => entries?.Where(e =>
+        (selectedIndicatorId == null || e.IndicatorId == selectedIndicatorId) &&
+        (selectedUnitId == null || e.UnitId == selectedUnitId) &&
+        (string.IsNullOrEmpty(selectedYear) || e.AcademicYear == selectedYear) &&
+        (string.IsNullOrEmpty(selectedStatus) || e.Status == selectedStatus) &&
+        (string.IsNullOrEmpty(searchTerm) ||
+            e.IndicatorName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+            e.IndicatorCode.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+    );
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (indicator.HasValue)
+        {
+            selectedIndicatorId = indicator.Value;
+        }
+        await Task.WhenAll(LoadEntries(), LoadIndicators(), LoadUnits());
+    }
+
+    private async Task LoadEntries()
+    {
+        try
+        {
+            entries = await Api.GetAsync<List<IndicatorEntryDto>>("api/v1/indicators/entries");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading entries: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadIndicators()
+    {
+        try
+        {
+            indicators = await Api.GetAsync<List<IndicatorDto>>("api/v1/indicators");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading indicators: {ex.Message}");
+        }
+    }
+
+    private async Task LoadUnits()
+    {
+        try
+        {
+            units = await Api.GetAsync<List<UnitDto>>("api/v1/units");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading units: {ex.Message}");
+        }
+    }
+
+    private async Task SubmitEntry(Guid entryId)
+    {
+        try
+        {
+            await Api.PatchAsync($"api/v1/indicators/entries/{entryId}/submit");
+            await LoadEntries();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error submitting entry: {ex.Message}");
+        }
+    }
+
+    private string GetStatusBadgeClass(string status) => status switch
+    {
+        "Draft" => "badge-secondary",
+        "Submitted" => "badge-info",
+        "Approved" => "badge-success",
+        "Rejected" => "badge-danger",
+        _ => "badge-secondary"
+    };
+
+    private string GetStatusDisplay(string status) => status switch
+    {
+        "Draft" => "Taslak",
+        "Submitted" => "Gonderildi",
+        "Approved" => "Onaylandi",
+        "Rejected" => "Reddedildi",
+        _ => status
+    };
+}

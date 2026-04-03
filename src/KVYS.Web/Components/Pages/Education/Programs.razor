@@ -1,0 +1,233 @@
+@page "/programs"
+@attribute [Authorize]
+@using KVYS.Web.Models
+@inject ApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>Programlar - KVYS</PageTitle>
+
+<div class="flex justify-between items-center mb-lg">
+    <div>
+        <h1 class="page-title m-0">Programlar</h1>
+        <p class="text-secondary text-sm">Egitim programlari ve program ciktilari</p>
+    </div>
+</div>
+
+<div class="card mb-lg">
+    <div class="card-body">
+        <div class="grid grid-cols-3 gap-md">
+            <div class="form-group m-0">
+                <label class="form-label">Fakulte</label>
+                <select class="form-select" @onchange="OnFacultyChanged">
+                    <option value="">Tum Fakulteler</option>
+                    @if (faculties != null)
+                    {
+                        @foreach (var faculty in faculties)
+                        {
+                            <option value="@faculty.Id">@faculty.Name</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="form-group m-0">
+                <label class="form-label">Bolum</label>
+                <select class="form-select" @bind="selectedDepartmentId" disabled="@(selectedFacultyId == null)">
+                    <option value="">Tum Bolumler</option>
+                    @if (departments != null)
+                    {
+                        @foreach (var dept in departments)
+                        {
+                            <option value="@dept.Id">@dept.Name</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="form-group m-0">
+                <label class="form-label">Seviye</label>
+                <select class="form-select" @bind="selectedLevel">
+                    <option value="">Tum Seviyeler</option>
+                    <option value="Lisans">Lisans</option>
+                    <option value="YuksekLisans">Yuksek Lisans</option>
+                    <option value="Doktora">Doktora</option>
+                </select>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (isLoading)
+{
+    <div class="card">
+        <div class="card-body">
+            <div class="flex items-center justify-center p-lg">
+                <div class="spinner"></div>
+            </div>
+        </div>
+    </div>
+}
+else if (filteredPrograms == null || !filteredPrograms.Any())
+{
+    <div class="card">
+        <div class="card-body">
+            <div class="empty-state">
+                <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
+                    <path d="M6 12v5c3 3 9 3 12 0v-5"/>
+                </svg>
+                <h3 class="empty-state-title">Program bulunamadi</h3>
+                <p class="empty-state-description">Secilen kriterlere uygun program bulunmamaktadir.</p>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Kod</th>
+                        <th>Program Adi</th>
+                        <th>Bolum</th>
+                        <th>Seviye</th>
+                        <th>Program Ciktisi</th>
+                        <th>Durum</th>
+                        <th style="width: 100px;">Islemler</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var program in filteredPrograms)
+                    {
+                        <tr>
+                            <td><code>@program.Code</code></td>
+                            <td>
+                                <a href="/programs/@program.Id" class="font-medium">@program.Name</a>
+                            </td>
+                            <td class="text-secondary">@program.DepartmentName</td>
+                            <td>
+                                <span class="badge @GetLevelBadgeClass(program.Level)">@GetLevelDisplay(program.Level)</span>
+                            </td>
+                            <td>
+                                <span class="badge badge-primary">@program.OutcomeCount PO</span>
+                            </td>
+                            <td>
+                                @if (program.IsActive)
+                                {
+                                    <span class="badge badge-success">Aktif</span>
+                                }
+                                else
+                                {
+                                    <span class="badge badge-secondary">Pasif</span>
+                                }
+                            </td>
+                            <td>
+                                <div class="table-actions">
+                                    <a href="/programs/@program.Id" class="btn btn-ghost btn-sm btn-icon" title="Detay">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                            <circle cx="12" cy="12" r="3"/>
+                                        </svg>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    private List<ProgramDetailDto>? programs;
+    private List<FacultyDto>? faculties;
+    private List<DepartmentDto>? departments;
+    private bool isLoading = true;
+
+    private Guid? selectedFacultyId;
+    private Guid? selectedDepartmentId;
+    private string? selectedLevel;
+
+    private IEnumerable<ProgramDetailDto>? filteredPrograms => programs?.Where(p =>
+        (selectedFacultyId == null || p.FacultyId == selectedFacultyId) &&
+        (selectedDepartmentId == null || p.DepartmentId == selectedDepartmentId) &&
+        (string.IsNullOrEmpty(selectedLevel) || p.Level == selectedLevel)
+    );
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.WhenAll(LoadPrograms(), LoadFaculties());
+    }
+
+    private async Task LoadPrograms()
+    {
+        try
+        {
+            programs = await Api.GetAsync<List<ProgramDetailDto>>("api/v1/programs");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading programs: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadFaculties()
+    {
+        try
+        {
+            faculties = await Api.GetAsync<List<FacultyDto>>("api/v1/faculties");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading faculties: {ex.Message}");
+        }
+    }
+
+    private async Task OnFacultyChanged(ChangeEventArgs e)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out var facultyId))
+        {
+            selectedFacultyId = facultyId;
+            selectedDepartmentId = null;
+            await LoadDepartments(facultyId);
+        }
+        else
+        {
+            selectedFacultyId = null;
+            selectedDepartmentId = null;
+            departments = null;
+        }
+    }
+
+    private async Task LoadDepartments(Guid facultyId)
+    {
+        try
+        {
+            var faculty = await Api.GetAsync<FacultyDetailDto>($"api/v1/faculties/{facultyId}");
+            departments = faculty?.Departments?.ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading departments: {ex.Message}");
+        }
+    }
+
+    private string GetLevelBadgeClass(string level) => level switch
+    {
+        "Lisans" => "badge-primary",
+        "YuksekLisans" => "badge-warning",
+        "Doktora" => "badge-info",
+        _ => "badge-secondary"
+    };
+
+    private string GetLevelDisplay(string level) => level switch
+    {
+        "YuksekLisans" => "Y. Lisans",
+        _ => level
+    };
+}

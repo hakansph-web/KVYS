@@ -1,0 +1,373 @@
+@page "/indicators/entries/new"
+@page "/indicators/entries/{EntryId:guid}"
+@attribute [Authorize]
+@using KVYS.Web.Models
+@inject ApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>@(isEdit ? "Veri Girisi Duzenle" : "Yeni Veri Girisi") - KVYS</PageTitle>
+
+<div class="breadcrumb mb-md">
+    <a href="/indicators/entries" class="breadcrumb-item">Veri Girisleri</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-current">@(isEdit ? "Duzenle" : "Yeni Giris")</span>
+</div>
+
+<div class="flex justify-between items-center mb-lg">
+    <div>
+        <h1 class="page-title m-0">@(isEdit ? "Veri Girisi Duzenle" : "Yeni Veri Girisi")</h1>
+        <p class="text-secondary text-sm">Gosterge icin deger girisi yapin</p>
+    </div>
+</div>
+
+@if (isLoading)
+{
+    <div class="card">
+        <div class="card-body">
+            <div class="flex items-center justify-center p-lg">
+                <div class="spinner"></div>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="grid grid-cols-3 gap-lg">
+        <div class="col-span-2">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Veri Girisi Formu</h3>
+                </div>
+                <div class="card-body">
+                    <EditForm Model="@model" OnValidSubmit="SaveEntry">
+                        <DataAnnotationsValidator />
+
+                        <div class="form-group">
+                            <label class="form-label required">Gosterge</label>
+                            <select class="form-select" @bind="model.IndicatorId" disabled="@isEdit">
+                                <option value="">Gosterge secin</option>
+                                @if (indicators != null)
+                                {
+                                    @foreach (var indicator in indicators)
+                                    {
+                                        <option value="@indicator.Id">@indicator.Code - @indicator.Name</option>
+                                    }
+                                }
+                            </select>
+                            <ValidationMessage For="@(() => model.IndicatorId)" class="form-error" />
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-md">
+                            <div class="form-group">
+                                <label class="form-label required">Birim</label>
+                                <select class="form-select" @bind="model.UnitId" disabled="@isEdit">
+                                    <option value="">Birim secin</option>
+                                    @if (units != null)
+                                    {
+                                        @foreach (var unit in units)
+                                        {
+                                            <option value="@unit.Id">@unit.Name</option>
+                                        }
+                                    }
+                                </select>
+                                <ValidationMessage For="@(() => model.UnitId)" class="form-error" />
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label required">Akademik Yil</label>
+                                <select class="form-select" @bind="model.AcademicYear" disabled="@isEdit">
+                                    <option value="">Yil secin</option>
+                                    <option value="2024-2025">2024-2025</option>
+                                    <option value="2023-2024">2023-2024</option>
+                                    <option value="2022-2023">2022-2023</option>
+                                </select>
+                                <ValidationMessage For="@(() => model.AcademicYear)" class="form-error" />
+                            </div>
+                        </div>
+
+                        @if (selectedIndicator != null)
+                        {
+                            <div class="form-group">
+                                <label class="form-label required">Deger @(selectedIndicator.Unit != null ? $"({selectedIndicator.Unit})" : "")</label>
+                                @if (selectedIndicator.DataType == "Numeric" || selectedIndicator.DataType == "Percentage")
+                                {
+                                    <input type="number" step="0.01" class="form-input" @bind="model.NumericValue" />
+                                }
+                                else if (selectedIndicator.DataType == "Boolean")
+                                {
+                                    <select class="form-select" @bind="model.TextValue">
+                                        <option value="">Secin</option>
+                                        <option value="Evet">Evet</option>
+                                        <option value="Hayir">Hayir</option>
+                                    </select>
+                                }
+                                else
+                                {
+                                    <textarea class="form-input" rows="3" @bind="model.TextValue"></textarea>
+                                }
+                            </div>
+                        }
+
+                        <div class="form-group">
+                            <label class="form-label">Notlar</label>
+                            <textarea class="form-input" rows="3" @bind="model.Notes" placeholder="Ek aciklama veya notlar..."></textarea>
+                        </div>
+
+                        <div class="flex gap-md mt-lg">
+                            <button type="submit" class="btn btn-primary" disabled="@isSaving">
+                                @if (isSaving)
+                                {
+                                    <span class="spinner spinner-sm"></span>
+                                }
+                                @(isEdit ? "Guncelle" : "Kaydet")
+                            </button>
+                            <button type="button" class="btn btn-secondary" @onclick="Cancel">Iptal</button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            @if (selectedIndicator != null)
+            {
+                <div class="card mb-md">
+                    <div class="card-header">
+                        <h3 class="card-title">Gosterge Bilgisi</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-md">
+                            <div class="text-sm text-secondary mb-xs">Kod</div>
+                            <div class="font-medium"><code>@selectedIndicator.Code</code></div>
+                        </div>
+                        <div class="mb-md">
+                            <div class="text-sm text-secondary mb-xs">Ad</div>
+                            <div class="font-medium">@selectedIndicator.Name</div>
+                        </div>
+                        @if (!string.IsNullOrEmpty(selectedIndicator.Description))
+                        {
+                            <div class="mb-md">
+                                <div class="text-sm text-secondary mb-xs">Aciklama</div>
+                                <div class="text-sm">@selectedIndicator.Description</div>
+                            </div>
+                        }
+                        <div class="mb-md">
+                            <div class="text-sm text-secondary mb-xs">Veri Tipi</div>
+                            <span class="badge @GetDataTypeBadgeClass(selectedIndicator.DataType)">
+                                @GetDataTypeDisplay(selectedIndicator.DataType)
+                            </span>
+                        </div>
+                        @if (selectedIndicator.TargetValue.HasValue)
+                        {
+                            <div class="mb-md">
+                                <div class="text-sm text-secondary mb-xs">Hedef</div>
+                                <div class="font-medium">@selectedIndicator.TargetValue @selectedIndicator.Unit</div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+            @if (isEdit && entry != null)
+            {
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Durum</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-md">
+                            <span class="badge @GetStatusBadgeClass(entry.Status)">
+                                @GetStatusDisplay(entry.Status)
+                            </span>
+                        </div>
+                        @if (entry.Status == "Draft")
+                        {
+                            <button class="btn btn-primary btn-sm" @onclick="SubmitEntry">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                                </svg>
+                                Onaya Gonder
+                            </button>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid? EntryId { get; set; }
+
+    private bool isEdit => EntryId.HasValue;
+    private bool isLoading = true;
+    private bool isSaving = false;
+
+    private List<IndicatorDto>? indicators;
+    private List<UnitDto>? units;
+    private IndicatorEntryDto? entry;
+    private IndicatorDto? selectedIndicator;
+
+    private EntryFormModel model = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.WhenAll(LoadIndicators(), LoadUnits());
+
+        if (isEdit && EntryId.HasValue)
+        {
+            await LoadEntry();
+        }
+
+        isLoading = false;
+    }
+
+    private async Task LoadIndicators()
+    {
+        try
+        {
+            indicators = await Api.GetAsync<List<IndicatorDto>>("api/v1/indicators");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading indicators: {ex.Message}");
+        }
+    }
+
+    private async Task LoadUnits()
+    {
+        try
+        {
+            units = await Api.GetAsync<List<UnitDto>>("api/v1/units");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading units: {ex.Message}");
+        }
+    }
+
+    private async Task LoadEntry()
+    {
+        try
+        {
+            entry = await Api.GetAsync<IndicatorEntryDto>($"api/v1/indicators/entries/{EntryId}");
+            if (entry != null)
+            {
+                model.IndicatorId = entry.IndicatorId;
+                model.UnitId = entry.UnitId;
+                model.AcademicYear = entry.AcademicYear;
+                model.NumericValue = entry.NumericValue;
+                model.TextValue = entry.TextValue;
+
+                UpdateSelectedIndicator();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading entry: {ex.Message}");
+        }
+    }
+
+    private void UpdateSelectedIndicator()
+    {
+        if (model.IndicatorId.HasValue && indicators != null)
+        {
+            selectedIndicator = indicators.FirstOrDefault(i => i.Id == model.IndicatorId);
+        }
+        else
+        {
+            selectedIndicator = null;
+        }
+    }
+
+    private async Task SaveEntry()
+    {
+        UpdateSelectedIndicator();
+
+        isSaving = true;
+        try
+        {
+            if (isEdit)
+            {
+                await Api.PutAsync($"api/v1/indicators/entries/{EntryId}", model);
+            }
+            else
+            {
+                await Api.PostAsync<EntryFormModel, IndicatorEntryDto>("api/v1/indicators/entries", model);
+            }
+            Navigation.NavigateTo("/indicators/entries");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving entry: {ex.Message}");
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task SubmitEntry()
+    {
+        try
+        {
+            await Api.PatchAsync($"api/v1/indicators/entries/{EntryId}/submit");
+            await LoadEntry();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error submitting entry: {ex.Message}");
+        }
+    }
+
+    private void Cancel()
+    {
+        Navigation.NavigateTo("/indicators/entries");
+    }
+
+    private string GetDataTypeBadgeClass(string dataType) => dataType switch
+    {
+        "Numeric" => "badge-primary",
+        "Percentage" => "badge-info",
+        "Text" => "badge-secondary",
+        "Boolean" => "badge-warning",
+        _ => "badge-secondary"
+    };
+
+    private string GetDataTypeDisplay(string dataType) => dataType switch
+    {
+        "Numeric" => "Sayisal",
+        "Percentage" => "Yuzde",
+        "Text" => "Metin",
+        "Boolean" => "Evet/Hayir",
+        _ => dataType
+    };
+
+    private string GetStatusBadgeClass(string status) => status switch
+    {
+        "Draft" => "badge-secondary",
+        "Submitted" => "badge-info",
+        "Approved" => "badge-success",
+        "Rejected" => "badge-danger",
+        _ => "badge-secondary"
+    };
+
+    private string GetStatusDisplay(string status) => status switch
+    {
+        "Draft" => "Taslak",
+        "Submitted" => "Gonderildi",
+        "Approved" => "Onaylandi",
+        "Rejected" => "Reddedildi",
+        _ => status
+    };
+
+    private class EntryFormModel
+    {
+        public Guid? IndicatorId { get; set; }
+        public Guid? UnitId { get; set; }
+        public string? AcademicYear { get; set; }
+        public decimal? NumericValue { get; set; }
+        public string? TextValue { get; set; }
+        public string? Notes { get; set; }
+    }
+}

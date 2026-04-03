@@ -1,0 +1,313 @@
+@page "/reports/kidr"
+@attribute [Authorize]
+@using KVYS.Web.Models
+@inject ApiClient Api
+
+<PageTitle>KIDR Raporu - KVYS</PageTitle>
+
+<div class="flex justify-between items-center mb-lg">
+    <div>
+        <h1 class="page-title m-0">Kurumsal Ic Degerlendirme Raporu</h1>
+        <p class="text-secondary text-sm">Kalite gostergelerinin donemsel ozet raporu</p>
+    </div>
+    <div class="flex gap-md">
+        <select class="form-select" style="width: 150px;" @bind="selectedYear" @bind:after="LoadReport">
+            <option value="2024-2025">2024-2025</option>
+            <option value="2023-2024">2023-2024</option>
+            <option value="2022-2023">2022-2023</option>
+        </select>
+        <button class="btn btn-secondary" @onclick="ExportReport">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+            </svg>
+            Disa Aktar
+        </button>
+    </div>
+</div>
+
+@if (isLoading)
+{
+    <div class="card">
+        <div class="card-body">
+            <div class="flex items-center justify-center p-lg">
+                <div class="spinner"></div>
+            </div>
+        </div>
+    </div>
+}
+else if (report == null)
+{
+    <div class="card">
+        <div class="card-body">
+            <div class="empty-state">
+                <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z"/>
+                </svg>
+                <h3 class="empty-state-title">Rapor bulunamadi</h3>
+                <p class="empty-state-description">Secilen akademik yil icin rapor verisi bulunmamaktadir.</p>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-4 gap-lg mb-lg">
+        <div class="card">
+            <div class="card-body">
+                <div class="flex items-center gap-md">
+                    <div class="stat-icon stat-icon-primary">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 19v-6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2zm0 0V9a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v10m-6 0a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2m0 0V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="text-sm text-secondary">Toplam Gosterge</div>
+                        <div class="stat-value">@report.Summary.TotalIndicators</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-body">
+                <div class="flex items-center gap-md">
+                    <div class="stat-icon stat-icon-success">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="text-sm text-secondary">Tamamlanan</div>
+                        <div class="stat-value">@report.Summary.CompletedIndicators</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-body">
+                <div class="flex items-center gap-md">
+                    <div class="stat-icon stat-icon-info">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <polyline points="12 6 12 12 16 14"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="text-sm text-secondary">Tamamlanma Orani</div>
+                        <div class="stat-value">%@report.Summary.CompletionRate.ToString("F1")</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-body">
+                <div class="flex items-center gap-md">
+                    <div class="stat-icon stat-icon-warning">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="text-sm text-secondary">Hedefe Ulasilma</div>
+                        <div class="stat-value">%@report.Summary.TargetMetRate.ToString("F1")</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Categories -->
+    @foreach (var category in report.Categories)
+    {
+        <div class="card mb-lg">
+            <div class="card-header">
+                <div class="flex justify-between items-center">
+                    <h3 class="card-title">
+                        <code class="mr-sm">@category.CategoryCode</code>
+                        @category.CategoryName
+                    </h3>
+                    <div class="flex gap-md">
+                        <span class="badge badge-primary">@category.TotalIndicators gosterge</span>
+                        <span class="badge badge-success">@category.CompletedIndicators tamamlandi</span>
+                        <span class="badge badge-warning">@category.TargetMetCount hedefe ulasti</span>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Kod</th>
+                                <th>Gosterge</th>
+                                <th>Hedef</th>
+                                <th>Gerceklesen</th>
+                                <th>Durum</th>
+                                <th>Basari</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var indicator in category.Indicators)
+                            {
+                                <tr>
+                                    <td><code>@indicator.Code</code></td>
+                                    <td>@indicator.Name</td>
+                                    <td>
+                                        @if (indicator.TargetValue.HasValue)
+                                        {
+                                            <span>@indicator.TargetValue</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (indicator.ActualValue.HasValue)
+                                        {
+                                            <span class="font-medium">@indicator.ActualValue</span>
+                                        }
+                                        else if (!string.IsNullOrEmpty(indicator.TextValue))
+                                        {
+                                            <span>@indicator.TextValue</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        <span class="badge @GetStatusBadgeClass(indicator.Status)">
+                                            @GetStatusDisplay(indicator.Status)
+                                        </span>
+                                    </td>
+                                    <td>
+                                        @if (indicator.Status == "Completed" || indicator.Status == "Approved")
+                                        {
+                                            @if (indicator.IsTargetMet)
+                                            {
+                                                <span class="badge badge-success">
+                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <polyline points="20 6 9 17 4 12"/>
+                                                    </svg>
+                                                </span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge badge-danger">
+                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <line x1="18" y1="6" x2="6" y2="18"/>
+                                                        <line x1="6" y1="6" x2="18" y2="18"/>
+                                                    </svg>
+                                                </span>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer">
+                <div class="flex items-center gap-md">
+                    <span class="text-sm text-secondary">Ilerleme:</span>
+                    <div class="progress-bar" style="flex: 1;">
+                        <div class="progress-fill" style="width: @(category.TotalIndicators > 0 ? (category.CompletedIndicators * 100 / category.TotalIndicators) : 0)%"></div>
+                    </div>
+                    <span class="text-sm font-medium">
+                        @(category.TotalIndicators > 0 ? (category.CompletedIndicators * 100 / category.TotalIndicators) : 0)%
+                    </span>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+<style>
+    .stat-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .stat-icon-primary { background: rgba(30, 58, 95, 0.1); color: var(--primary); }
+    .stat-icon-success { background: rgba(5, 150, 105, 0.1); color: var(--success); }
+    .stat-icon-info { background: rgba(59, 130, 246, 0.1); color: var(--info); }
+    .stat-icon-warning { background: rgba(217, 119, 6, 0.1); color: var(--warning); }
+    .stat-value {
+        font-size: 24px;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+    .progress-bar {
+        height: 8px;
+        background: var(--bg-secondary);
+        border-radius: 4px;
+        overflow: hidden;
+    }
+    .progress-fill {
+        height: 100%;
+        background: var(--success);
+        transition: width 0.3s ease;
+    }
+</style>
+
+@code {
+    private string selectedYear = "2024-2025";
+    private KIDRReportDto? report;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadReport();
+    }
+
+    private async Task LoadReport()
+    {
+        isLoading = true;
+        try
+        {
+            report = await Api.GetAsync<KIDRReportDto>($"api/v1/reports/kidr/{selectedYear}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading KIDR report: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ExportReport()
+    {
+        // TODO: Implement export functionality
+    }
+
+    private string GetStatusBadgeClass(string status) => status switch
+    {
+        "Draft" => "badge-secondary",
+        "Submitted" => "badge-info",
+        "Approved" or "Completed" => "badge-success",
+        "Rejected" => "badge-danger",
+        _ => "badge-secondary"
+    };
+
+    private string GetStatusDisplay(string status) => status switch
+    {
+        "Draft" => "Taslak",
+        "Submitted" => "Gonderildi",
+        "Approved" => "Onaylandi",
+        "Completed" => "Tamamlandi",
+        "Rejected" => "Reddedildi",
+        "Pending" => "Bekliyor",
+        _ => status
+    };
+}

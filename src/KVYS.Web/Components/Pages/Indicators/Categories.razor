@@ -1,0 +1,162 @@
+@page "/indicators/categories"
+@attribute [Authorize]
+@using KVYS.Web.Models
+@using KVYS.Web.Components.Shared
+@inject ApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>Gosterge Kategorileri - KVYS</PageTitle>
+
+<div class="flex justify-between items-center mb-lg">
+    <div>
+        <h1 class="page-title m-0">Gosterge Kategorileri</h1>
+        <p class="text-secondary text-sm">Kalite gostergelerinin kategori hiyerarsisi</p>
+    </div>
+</div>
+
+@if (isLoading)
+{
+    <div class="card">
+        <div class="card-body">
+            <div class="flex items-center justify-center p-lg">
+                <div class="spinner"></div>
+            </div>
+        </div>
+    </div>
+}
+else if (categories == null || !categories.Any())
+{
+    <div class="card">
+        <div class="card-body">
+            <div class="empty-state">
+                <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/>
+                </svg>
+                <h3 class="empty-state-title">Henuz kategori eklenmemis</h3>
+                <p class="empty-state-description">Kalite gostergeleri icin kategori tanimlanmamis.</p>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="grid grid-cols-3 gap-lg">
+        <div class="col-span-2">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Kategori Agaci</h3>
+                </div>
+                <div class="card-body">
+                    <div class="category-tree">
+                        @foreach (var category in categories.Where(c => c.ParentId == null))
+                        {
+                            <CategoryTreeNode Category="category" ExpandedIds="expandedIds" OnToggle="ToggleExpand" OnSelect="SelectCategory" SelectedId="selectedCategoryId" />
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div>
+            @if (selectedCategory != null)
+            {
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Kategori Detayi</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-md">
+                            <div class="text-sm text-secondary mb-xs">Kod</div>
+                            <div class="font-medium"><code>@selectedCategory.Code</code></div>
+                        </div>
+                        <div class="mb-md">
+                            <div class="text-sm text-secondary mb-xs">Ad</div>
+                            <div class="font-medium">@selectedCategory.Name</div>
+                        </div>
+                        <div class="mb-md">
+                            <div class="text-sm text-secondary mb-xs">Gosterge Sayisi</div>
+                            <div>
+                                <span class="badge badge-primary">@selectedCategory.IndicatorCount gosterge</span>
+                            </div>
+                        </div>
+                        @if (selectedCategory.Children?.Any() == true)
+                        {
+                            <div class="mb-md">
+                                <div class="text-sm text-secondary mb-xs">Alt Kategoriler</div>
+                                <div>
+                                    <span class="badge badge-info">@selectedCategory.Children.Count alt kategori</span>
+                                </div>
+                            </div>
+                        }
+                        <div class="mt-lg">
+                            <a href="/indicators?category=@selectedCategory.Id" class="btn btn-primary btn-sm">
+                                Gostergeleri Gor
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="card">
+                    <div class="card-body">
+                        <div class="text-center text-secondary p-lg">
+                            Detaylari gormek icin bir kategori secin
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private List<IndicatorCategoryDto>? categories;
+    private bool isLoading = true;
+    private HashSet<Guid> expandedIds = new();
+    private Guid? selectedCategoryId;
+    private IndicatorCategoryDto? selectedCategory;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCategories();
+    }
+
+    private async Task LoadCategories()
+    {
+        isLoading = true;
+        try
+        {
+            categories = await Api.GetAsync<List<IndicatorCategoryDto>>("api/v1/indicators/categories");
+            // Expand first level by default
+            if (categories != null)
+            {
+                foreach (var cat in categories.Where(c => c.ParentId == null))
+                {
+                    expandedIds.Add(cat.Id);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading categories: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ToggleExpand(Guid id)
+    {
+        if (expandedIds.Contains(id))
+            expandedIds.Remove(id);
+        else
+            expandedIds.Add(id);
+    }
+
+    private void SelectCategory(IndicatorCategoryDto category)
+    {
+        selectedCategoryId = category.Id;
+        selectedCategory = category;
+    }
+}

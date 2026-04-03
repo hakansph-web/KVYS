@@ -1,0 +1,205 @@
+@page "/faculties"
+@attribute [Authorize]
+@using KVYS.Web.Models
+@inject ApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>Fakulteler - KVYS</PageTitle>
+
+<div class="flex justify-between items-center mb-lg">
+    <div>
+        <h1 class="page-title m-0">Fakulteler</h1>
+        <p class="text-secondary text-sm">Universite fakulte ve bolum yonetimi</p>
+    </div>
+    <button class="btn btn-primary" @onclick="() => showCreateModal = true">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 5v14M5 12h14"/>
+        </svg>
+        Yeni Fakulte
+    </button>
+</div>
+
+@if (isLoading)
+{
+    <div class="card">
+        <div class="card-body">
+            <div class="flex items-center justify-center p-lg">
+                <div class="spinner"></div>
+            </div>
+        </div>
+    </div>
+}
+else if (faculties == null || !faculties.Any())
+{
+    <div class="card">
+        <div class="card-body">
+            <div class="empty-state">
+                <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5m-4 0h4"/>
+                </svg>
+                <h3 class="empty-state-title">Henuz fakulte eklenmemis</h3>
+                <p class="empty-state-description">Ilk fakulteyi ekleyerek baslayabilirsiniz.</p>
+                <button class="btn btn-primary" @onclick="() => showCreateModal = true">
+                    Fakulte Ekle
+                </button>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Kod</th>
+                        <th>Fakulte Adi</th>
+                        <th>Bolum Sayisi</th>
+                        <th>Durum</th>
+                        <th style="width: 100px;">Islemler</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var faculty in faculties)
+                    {
+                        <tr>
+                            <td><code>@faculty.Code</code></td>
+                            <td>
+                                <a href="/faculties/@faculty.Id" class="font-medium">@faculty.Name</a>
+                            </td>
+                            <td>
+                                <span class="badge badge-primary">@faculty.DepartmentCount bolum</span>
+                            </td>
+                            <td>
+                                @if (faculty.IsActive)
+                                {
+                                    <span class="badge badge-success">Aktif</span>
+                                }
+                                else
+                                {
+                                    <span class="badge badge-secondary">Pasif</span>
+                                }
+                            </td>
+                            <td>
+                                <div class="table-actions">
+                                    <a href="/faculties/@faculty.Id" class="btn btn-ghost btn-sm btn-icon" title="Detay">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                            <circle cx="12" cy="12" r="3"/>
+                                        </svg>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@if (showCreateModal)
+{
+    <div class="modal-backdrop show" @onclick="CloseModal">
+        <div class="modal" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h3 class="modal-title">Yeni Fakulte</h3>
+                <button class="modal-close" @onclick="CloseModal">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <EditForm Model="@newFaculty" OnValidSubmit="CreateFaculty">
+                <DataAnnotationsValidator />
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label required">Fakulte Kodu</label>
+                        <InputText class="form-input" @bind-Value="newFaculty.Code" placeholder="ornek: MUH" />
+                        <ValidationMessage For="@(() => newFaculty.Code)" class="form-error" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label required">Fakulte Adi</label>
+                        <InputText class="form-input" @bind-Value="newFaculty.Name" placeholder="ornek: Muhendislik Fakultesi" />
+                        <ValidationMessage For="@(() => newFaculty.Name)" class="form-error" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseModal">Iptal</button>
+                    <button type="submit" class="btn btn-primary" disabled="@isSaving">
+                        @if (isSaving)
+                        {
+                            <span class="spinner spinner-sm"></span>
+                        }
+                        Kaydet
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@code {
+    private List<FacultyDto>? faculties;
+    private bool isLoading = true;
+    private bool showCreateModal = false;
+    private bool isSaving = false;
+    private CreateFacultyModel newFaculty = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadFaculties();
+    }
+
+    private async Task LoadFaculties()
+    {
+        isLoading = true;
+        try
+        {
+            faculties = await Api.GetAsync<List<FacultyDto>>("api/v1/faculties");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading faculties: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void CloseModal()
+    {
+        showCreateModal = false;
+        newFaculty = new();
+    }
+
+    private async Task CreateFaculty()
+    {
+        isSaving = true;
+        try
+        {
+            var result = await Api.PostAsync<CreateFacultyModel, FacultyDto>("api/v1/faculties", newFaculty);
+            if (result != null)
+            {
+                CloseModal();
+                await LoadFaculties();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error creating faculty: {ex.Message}");
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private class CreateFacultyModel
+    {
+        public string Code { get; set; } = "";
+        public string Name { get; set; } = "";
+    }
+}

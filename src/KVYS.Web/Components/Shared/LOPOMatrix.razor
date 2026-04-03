@@ -1,0 +1,96 @@
+@namespace KVYS.Web.Components.Shared
+@using KVYS.Web.Models
+
+<div class="matrix-container">
+    <table class="matrix-table">
+        <thead>
+            <tr>
+                <th class="row-header">Ogrenme Ciktilari</th>
+                @foreach (var po in ProgramOutcomes)
+                {
+                    <th title="@po.Description">@po.Code</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var lo in LearningOutcomes)
+            {
+                <tr>
+                    <td class="row-header" title="@lo.Description">@lo.Code</td>
+                    @foreach (var po in ProgramOutcomes)
+                    {
+                        var level = GetContributionLevel(lo.Id, po.Id);
+                        <td class="matrix-cell level-@level" title="@GetLevelDescription(level)">
+                            @if (level > 0)
+                            {
+                                @level
+                            }
+                        </td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<div class="flex gap-lg mt-lg">
+    <div class="flex items-center gap-sm">
+        <div class="matrix-legend level-0"></div>
+        <span class="text-sm">Iliski Yok</span>
+    </div>
+    <div class="flex items-center gap-sm">
+        <div class="matrix-legend level-1"></div>
+        <span class="text-sm">Dusuk (1)</span>
+    </div>
+    <div class="flex items-center gap-sm">
+        <div class="matrix-legend level-2"></div>
+        <span class="text-sm">Orta (2)</span>
+    </div>
+    <div class="flex items-center gap-sm">
+        <div class="matrix-legend level-3"></div>
+        <span class="text-sm">Yuksek (3)</span>
+    </div>
+</div>
+
+<style>
+    .matrix-legend {
+        width: 24px;
+        height: 24px;
+        border-radius: 4px;
+        border: 1px solid var(--border-color);
+    }
+    .matrix-legend.level-0 { background: transparent; }
+    .matrix-legend.level-1 { background: rgba(5, 150, 105, 0.2); }
+    .matrix-legend.level-2 { background: rgba(5, 150, 105, 0.4); }
+    .matrix-legend.level-3 { background: rgba(5, 150, 105, 0.6); }
+</style>
+
+@code {
+    [Parameter] public List<LearningOutcomeDto> LearningOutcomes { get; set; } = new();
+    [Parameter] public List<ProgramOutcomeDto> ProgramOutcomes { get; set; } = new();
+    [Parameter] public Dictionary<(Guid LoId, Guid PoId), int>? Mappings { get; set; }
+
+    private int GetContributionLevel(Guid loId, Guid poId)
+    {
+        if (Mappings != null && Mappings.TryGetValue((loId, poId), out var level))
+            return level;
+
+        // If mappings not provided, check if LO has mapped POs
+        var lo = LearningOutcomes.FirstOrDefault(l => l.Id == loId);
+        var po = ProgramOutcomes.FirstOrDefault(p => p.Id == poId);
+
+        if (lo?.MappedPOs?.Contains(po?.Code ?? "") == true)
+            return 2; // Default to medium contribution
+
+        return 0;
+    }
+
+    private string GetLevelDescription(int level) => level switch
+    {
+        0 => "Iliski yok",
+        1 => "Dusuk katki",
+        2 => "Orta katki",
+        3 => "Yuksek katki",
+        _ => ""
+    };
+}

@@ -1,0 +1,275 @@
+@page "/indicators"
+@attribute [Authorize]
+@using KVYS.Web.Models
+@inject ApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>Gostergeler - KVYS</PageTitle>
+
+<div class="flex justify-between items-center mb-lg">
+    <div>
+        <h1 class="page-title m-0">Kalite Gostergeleri</h1>
+        <p class="text-secondary text-sm">Kurumsal kalite gostergelerinin listesi</p>
+    </div>
+</div>
+
+<div class="card mb-lg">
+    <div class="card-body">
+        <div class="grid grid-cols-4 gap-md">
+            <div class="form-group m-0">
+                <label class="form-label">Kategori</label>
+                <select class="form-select" @bind="selectedCategoryId">
+                    <option value="">Tum Kategoriler</option>
+                    @if (categories != null)
+                    {
+                        @foreach (var category in GetFlatCategories())
+                        {
+                            <option value="@category.Id">@category.Name</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="form-group m-0">
+                <label class="form-label">Veri Tipi</label>
+                <select class="form-select" @bind="selectedDataType">
+                    <option value="">Tum Tipler</option>
+                    <option value="Numeric">Sayisal</option>
+                    <option value="Percentage">Yuzde</option>
+                    <option value="Text">Metin</option>
+                    <option value="Boolean">Evet/Hayir</option>
+                </select>
+            </div>
+            <div class="form-group m-0">
+                <label class="form-label">Durum</label>
+                <select class="form-select" @bind="selectedStatus">
+                    <option value="">Tum Durumlar</option>
+                    <option value="true">Aktif</option>
+                    <option value="false">Pasif</option>
+                </select>
+            </div>
+            <div class="form-group m-0">
+                <label class="form-label">Ara</label>
+                <input type="text" class="form-input" placeholder="Gosterge adi veya kodu..." @bind="searchTerm" @bind:event="oninput" />
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (isLoading)
+{
+    <div class="card">
+        <div class="card-body">
+            <div class="flex items-center justify-center p-lg">
+                <div class="spinner"></div>
+            </div>
+        </div>
+    </div>
+}
+else if (filteredIndicators == null || !filteredIndicators.Any())
+{
+    <div class="card">
+        <div class="card-body">
+            <div class="empty-state">
+                <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M9 19v-6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2zm0 0V9a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v10m-6 0a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2m0 0V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2z"/>
+                </svg>
+                <h3 class="empty-state-title">Gosterge bulunamadi</h3>
+                <p class="empty-state-description">Secilen kriterlere uygun gosterge bulunmamaktadir.</p>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="card-header">
+            <span class="text-sm text-secondary">@filteredIndicators.Count() gosterge listeleniyor</span>
+        </div>
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Kod</th>
+                        <th>Gosterge Adi</th>
+                        <th>Kategori</th>
+                        <th>Veri Tipi</th>
+                        <th>Hedef</th>
+                        <th>Yon</th>
+                        <th>Durum</th>
+                        <th style="width: 100px;">Islemler</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var indicator in filteredIndicators)
+                    {
+                        <tr>
+                            <td><code>@indicator.Code</code></td>
+                            <td>
+                                <div class="font-medium">@indicator.Name</div>
+                                @if (!string.IsNullOrEmpty(indicator.Description))
+                                {
+                                    <div class="text-sm text-secondary text-truncate" style="max-width: 300px;" title="@indicator.Description">
+                                        @indicator.Description
+                                    </div>
+                                }
+                            </td>
+                            <td class="text-secondary text-sm">@indicator.CategoryName</td>
+                            <td>
+                                <span class="badge @GetDataTypeBadgeClass(indicator.DataType)">
+                                    @GetDataTypeDisplay(indicator.DataType)
+                                </span>
+                            </td>
+                            <td>
+                                @if (indicator.TargetValue.HasValue)
+                                {
+                                    <span>@indicator.TargetValue @indicator.Unit</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">-</span>
+                                }
+                            </td>
+                            <td>
+                                @if (indicator.Direction == "Up")
+                                {
+                                    <span class="badge badge-success" title="Yuksek olmasi tercih edilir">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M12 19V5M5 12l7-7 7 7"/>
+                                        </svg>
+                                    </span>
+                                }
+                                else if (indicator.Direction == "Down")
+                                {
+                                    <span class="badge badge-warning" title="Dusuk olmasi tercih edilir">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M12 5v14M5 12l7 7 7-7"/>
+                                        </svg>
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">-</span>
+                                }
+                            </td>
+                            <td>
+                                @if (indicator.IsActive)
+                                {
+                                    <span class="badge badge-success">Aktif</span>
+                                }
+                                else
+                                {
+                                    <span class="badge badge-secondary">Pasif</span>
+                                }
+                            </td>
+                            <td>
+                                <div class="table-actions">
+                                    <a href="/indicators/entries?indicator=@indicator.Id" class="btn btn-ghost btn-sm btn-icon" title="Veri Girisleri">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                        </svg>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    [SupplyParameterFromQuery]
+    public Guid? category { get; set; }
+
+    private List<IndicatorDto>? indicators;
+    private List<IndicatorCategoryDto>? categories;
+    private bool isLoading = true;
+
+    private Guid? selectedCategoryId;
+    private string? selectedDataType;
+    private string? selectedStatus;
+    private string? searchTerm;
+
+    private IEnumerable<IndicatorDto>? filteredIndicators => indicators?.Where(i =>
+        (selectedCategoryId == null || i.CategoryId == selectedCategoryId) &&
+        (string.IsNullOrEmpty(selectedDataType) || i.DataType == selectedDataType) &&
+        (string.IsNullOrEmpty(selectedStatus) || i.IsActive == (selectedStatus == "true")) &&
+        (string.IsNullOrEmpty(searchTerm) ||
+            i.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+            i.Code.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+    );
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (category.HasValue)
+        {
+            selectedCategoryId = category.Value;
+        }
+        await Task.WhenAll(LoadIndicators(), LoadCategories());
+    }
+
+    private async Task LoadIndicators()
+    {
+        try
+        {
+            indicators = await Api.GetAsync<List<IndicatorDto>>("api/v1/indicators");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading indicators: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadCategories()
+    {
+        try
+        {
+            categories = await Api.GetAsync<List<IndicatorCategoryDto>>("api/v1/indicators/categories");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading categories: {ex.Message}");
+        }
+    }
+
+    private IEnumerable<IndicatorCategoryDto> GetFlatCategories()
+    {
+        if (categories == null) yield break;
+
+        foreach (var cat in categories)
+        {
+            yield return cat;
+            if (cat.Children != null)
+            {
+                foreach (var child in cat.Children)
+                {
+                    yield return child;
+                }
+            }
+        }
+    }
+
+    private string GetDataTypeBadgeClass(string dataType) => dataType switch
+    {
+        "Numeric" => "badge-primary",
+        "Percentage" => "badge-info",
+        "Text" => "badge-secondary",
+        "Boolean" => "badge-warning",
+        _ => "badge-secondary"
+    };
+
+    private string GetDataTypeDisplay(string dataType) => dataType switch
+    {
+        "Numeric" => "Sayisal",
+        "Percentage" => "Yuzde",
+        "Text" => "Metin",
+        "Boolean" => "Evet/Hayir",
+        _ => dataType
+    };
+}

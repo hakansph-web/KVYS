@@ -1,0 +1,207 @@
+@page "/courses"
+@attribute [Authorize]
+@using KVYS.Web.Models
+@inject ApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>Dersler - KVYS</PageTitle>
+
+<div class="flex justify-between items-center mb-lg">
+    <div>
+        <h1 class="page-title m-0">Dersler</h1>
+        <p class="text-secondary text-sm">Ders ve ders acilim yonetimi</p>
+    </div>
+</div>
+
+<div class="card mb-lg">
+    <div class="card-body">
+        <div class="grid grid-cols-4 gap-md">
+            <div class="form-group m-0">
+                <label class="form-label">Program</label>
+                <select class="form-select" @bind="selectedProgramId">
+                    <option value="">Tum Programlar</option>
+                    @if (programs != null)
+                    {
+                        @foreach (var program in programs)
+                        {
+                            <option value="@program.Id">@program.Code - @program.Name</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="form-group m-0">
+                <label class="form-label">Ders Turu</label>
+                <select class="form-select" @bind="selectedType">
+                    <option value="">Tum Turler</option>
+                    <option value="Zorunlu">Zorunlu</option>
+                    <option value="Secmeli">Secmeli</option>
+                    <option value="Ortak">Ortak</option>
+                </select>
+            </div>
+            <div class="form-group m-0">
+                <label class="form-label">Donem</label>
+                <select class="form-select" @bind="selectedSemester">
+                    <option value="">Tum Donemler</option>
+                    @for (int i = 1; i <= 8; i++)
+                    {
+                        <option value="@i">@i. Yariyil</option>
+                    }
+                </select>
+            </div>
+            <div class="form-group m-0">
+                <label class="form-label">Ara</label>
+                <input type="text" class="form-input" placeholder="Ders adi veya kodu..." @bind="searchTerm" @bind:event="oninput" />
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (isLoading)
+{
+    <div class="card">
+        <div class="card-body">
+            <div class="flex items-center justify-center p-lg">
+                <div class="spinner"></div>
+            </div>
+        </div>
+    </div>
+}
+else if (filteredCourses == null || !filteredCourses.Any())
+{
+    <div class="card">
+        <div class="card-body">
+            <div class="empty-state">
+                <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                </svg>
+                <h3 class="empty-state-title">Ders bulunamadi</h3>
+                <p class="empty-state-description">Secilen kriterlere uygun ders bulunmamaktadir.</p>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="card-header">
+            <span class="text-sm text-secondary">@filteredCourses.Count() ders listeleniyor</span>
+        </div>
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Kod</th>
+                        <th>Ders Adi</th>
+                        <th>Program</th>
+                        <th>Kredi</th>
+                        <th>AKTS</th>
+                        <th>Tur</th>
+                        <th>Donem</th>
+                        <th>Durum</th>
+                        <th style="width: 100px;">Islemler</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var course in filteredCourses)
+                    {
+                        <tr>
+                            <td><code>@course.Code</code></td>
+                            <td>
+                                <a href="/courses/@course.Id" class="font-medium">@course.Name</a>
+                            </td>
+                            <td class="text-secondary text-sm">@course.ProgramCode</td>
+                            <td class="text-center">@course.Credits</td>
+                            <td class="text-center">@course.Ects</td>
+                            <td>
+                                <span class="badge @GetTypeBadgeClass(course.Type)">@course.Type</span>
+                            </td>
+                            <td class="text-center">@course.Semester</td>
+                            <td>
+                                @if (course.IsActive)
+                                {
+                                    <span class="badge badge-success">Aktif</span>
+                                }
+                                else
+                                {
+                                    <span class="badge badge-secondary">Pasif</span>
+                                }
+                            </td>
+                            <td>
+                                <div class="table-actions">
+                                    <a href="/courses/@course.Id" class="btn btn-ghost btn-sm btn-icon" title="Detay">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                            <circle cx="12" cy="12" r="3"/>
+                                        </svg>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    private List<CourseDto>? courses;
+    private List<ProgramDto>? programs;
+    private bool isLoading = true;
+
+    private Guid? selectedProgramId;
+    private string? selectedType;
+    private int? selectedSemester;
+    private string? searchTerm;
+
+    private IEnumerable<CourseDto>? filteredCourses => courses?.Where(c =>
+        (selectedProgramId == null || c.ProgramId == selectedProgramId) &&
+        (string.IsNullOrEmpty(selectedType) || c.Type == selectedType) &&
+        (selectedSemester == null || c.Semester == selectedSemester) &&
+        (string.IsNullOrEmpty(searchTerm) ||
+            c.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+            c.Code.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+    );
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.WhenAll(LoadCourses(), LoadPrograms());
+    }
+
+    private async Task LoadCourses()
+    {
+        try
+        {
+            courses = await Api.GetAsync<List<CourseDto>>("api/v1/courses");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading courses: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadPrograms()
+    {
+        try
+        {
+            programs = await Api.GetAsync<List<ProgramDto>>("api/v1/programs");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading programs: {ex.Message}");
+        }
+    }
+
+    private string GetTypeBadgeClass(string type) => type switch
+    {
+        "Zorunlu" => "badge-primary",
+        "Secmeli" => "badge-info",
+        "Ortak" => "badge-warning",
+        _ => "badge-secondary"
+    };
+}

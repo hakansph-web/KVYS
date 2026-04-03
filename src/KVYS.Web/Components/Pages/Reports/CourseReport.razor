@@ -1,0 +1,345 @@
+@page "/reports/course"
+@attribute [Authorize]
+@using KVYS.Web.Models
+@inject ApiClient Api
+
+<PageTitle>Ders Raporu - KVYS</PageTitle>
+
+<div class="flex justify-between items-center mb-lg">
+    <div>
+        <h1 class="page-title m-0">Ders Raporu</h1>
+        <p class="text-secondary text-sm">Ders ogrenme ciktilari basari ve PO katki analizi</p>
+    </div>
+</div>
+
+<div class="card mb-lg">
+    <div class="card-body">
+        <div class="grid grid-cols-4 gap-md">
+            <div class="form-group m-0">
+                <label class="form-label">Ders</label>
+                <select class="form-select" @bind="selectedCourseId" @bind:after="LoadInstances">
+                    <option value="">Ders secin</option>
+                    @if (courses != null)
+                    {
+                        @foreach (var course in courses)
+                        {
+                            <option value="@course.Id">@course.Code - @course.Name</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="form-group m-0">
+                <label class="form-label">Acilim</label>
+                <select class="form-select" @bind="selectedInstanceId" @bind:after="LoadReport" disabled="@(instances == null || !instances.Any())">
+                    <option value="">Acilim secin</option>
+                    @if (instances != null)
+                    {
+                        @foreach (var instance in instances)
+                        {
+                            <option value="@instance.Id">@instance.AcademicYear @instance.Semester</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="form-group m-0">
+            </div>
+            <div class="form-group m-0 flex items-end">
+                <button class="btn btn-secondary" @onclick="ExportReport" disabled="@(report == null)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                    </svg>
+                    Disa Aktar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (isLoading)
+{
+    <div class="card">
+        <div class="card-body">
+            <div class="flex items-center justify-center p-lg">
+                <div class="spinner"></div>
+            </div>
+        </div>
+    </div>
+}
+else if (selectedCourseId == null || selectedInstanceId == null)
+{
+    <div class="card">
+        <div class="card-body">
+            <div class="empty-state">
+                <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                </svg>
+                <h3 class="empty-state-title">Ders ve Acilim secin</h3>
+                <p class="empty-state-description">Raporu goruntulemek icin bir ders ve acilim secin.</p>
+            </div>
+        </div>
+    </div>
+}
+else if (report == null)
+{
+    <div class="card">
+        <div class="card-body">
+            <div class="empty-state">
+                <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z"/>
+                </svg>
+                <h3 class="empty-state-title">Rapor bulunamadi</h3>
+                <p class="empty-state-description">Secilen ders acilimi icin rapor verisi bulunmamaktadir.</p>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <!-- Statistics Summary -->
+    <div class="grid grid-cols-4 gap-lg mb-lg">
+        <div class="card">
+            <div class="card-body text-center">
+                <div class="stat-value-lg">@report.Statistics.StudentCount</div>
+                <div class="text-sm text-secondary">Ogrenci Sayisi</div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-body text-center">
+                <div class="stat-value-lg">@report.Statistics.AverageScore.ToString("F1")</div>
+                <div class="text-sm text-secondary">Ortalama Not</div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-body text-center">
+                <div class="stat-value-lg">%@report.Statistics.PassRate.ToString("F0")</div>
+                <div class="text-sm text-secondary">Gecme Orani</div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-body text-center">
+                <div class="stat-value-lg">@report.Statistics.ExamCount</div>
+                <div class="text-sm text-secondary">Sinav Sayisi</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-lg">
+        <!-- Learning Outcomes Achievement -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Ogrenme Ciktilari Basari Oranlari</h3>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>OC</th>
+                                <th>Bloom</th>
+                                <th>Basari</th>
+                                <th>Ogrenci</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var lo in report.LearningOutcomes)
+                            {
+                                <tr>
+                                    <td>
+                                        <code>@lo.Code</code>
+                                        <div class="text-xs text-secondary text-truncate" style="max-width: 150px;" title="@lo.Description">
+                                            @lo.Description
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge @GetBloomBadgeClass(lo.BloomLevel)">@lo.BloomLevel</span>
+                                    </td>
+                                    <td>
+                                        <div class="flex items-center gap-sm">
+                                            <div class="progress-bar-sm" style="width: 60px;">
+                                                <div class="progress-fill-sm @GetAchievementClass(lo.AchievementRate)"
+                                                     style="width: @lo.AchievementRate%"></div>
+                                            </div>
+                                            <span class="text-sm font-medium">%@lo.AchievementRate.ToString("F0")</span>
+                                        </div>
+                                    </td>
+                                    <td class="text-center text-sm">@lo.StudentCount</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- PO Contributions -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Program Ciktilarina Katki</h3>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>PO</th>
+                                <th>Katki Skoru</th>
+                                <th>Katkili OC</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var po in report.ProgramOutcomes)
+                            {
+                                <tr>
+                                    <td>
+                                        <code>@po.Code</code>
+                                        <div class="text-xs text-secondary text-truncate" style="max-width: 150px;" title="@po.Description">
+                                            @po.Description
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="flex items-center gap-sm">
+                                            <div class="contribution-bar">
+                                                <div class="contribution-fill" style="width: @(po.ContributionScore * 100 / 3)%"></div>
+                                            </div>
+                                            <span class="text-sm font-medium">@po.ContributionScore.ToString("F1")</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        @foreach (var lo in po.ContributingLOs)
+                                        {
+                                            <span class="badge badge-info" style="margin-right: 4px;">@lo</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .stat-value-lg {
+        font-size: 32px;
+        font-weight: 700;
+        color: var(--primary);
+    }
+    .progress-bar-sm {
+        height: 6px;
+        background: var(--bg-secondary);
+        border-radius: 3px;
+        overflow: hidden;
+    }
+    .progress-fill-sm {
+        height: 100%;
+        transition: width 0.3s ease;
+    }
+    .progress-fill-sm.achievement-low { background: var(--danger); }
+    .progress-fill-sm.achievement-medium { background: var(--warning); }
+    .progress-fill-sm.achievement-high { background: var(--success); }
+    .contribution-bar {
+        width: 60px;
+        height: 8px;
+        background: var(--bg-secondary);
+        border-radius: 4px;
+        overflow: hidden;
+    }
+    .contribution-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--primary) 0%, var(--success) 100%);
+        transition: width 0.3s ease;
+    }
+</style>
+
+@code {
+    private Guid? selectedCourseId;
+    private Guid? selectedInstanceId;
+    private List<CourseDto>? courses;
+    private List<CourseInstanceDto>? instances;
+    private CourseReportDto? report;
+    private bool isLoading = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCourses();
+    }
+
+    private async Task LoadCourses()
+    {
+        try
+        {
+            courses = await Api.GetAsync<List<CourseDto>>("api/v1/courses");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading courses: {ex.Message}");
+        }
+    }
+
+    private async Task LoadInstances()
+    {
+        if (selectedCourseId == null)
+        {
+            instances = null;
+            selectedInstanceId = null;
+            return;
+        }
+
+        try
+        {
+            instances = await Api.GetAsync<List<CourseInstanceDto>>($"api/v1/courses/{selectedCourseId}/instances");
+            selectedInstanceId = null;
+            report = null;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading instances: {ex.Message}");
+        }
+    }
+
+    private async Task LoadReport()
+    {
+        if (selectedCourseId == null || selectedInstanceId == null) return;
+
+        isLoading = true;
+        try
+        {
+            report = await Api.GetAsync<CourseReportDto>($"api/v1/reports/course/{selectedCourseId}/instance/{selectedInstanceId}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading course report: {ex.Message}");
+            report = null;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ExportReport()
+    {
+        // TODO: Implement export functionality
+    }
+
+    private string GetBloomBadgeClass(string level) => level switch
+    {
+        "Hatirlama" => "badge-secondary",
+        "Anlama" => "badge-info",
+        "Uygulama" => "badge-primary",
+        "Analiz" => "badge-warning",
+        "Degerlendirme" => "badge-danger",
+        "Yaratma" => "badge-success",
+        _ => "badge-secondary"
+    };
+
+    private string GetAchievementClass(decimal percentage)
+    {
+        if (percentage < 50) return "achievement-low";
+        if (percentage < 70) return "achievement-medium";
+        return "achievement-high";
+    }
+}
