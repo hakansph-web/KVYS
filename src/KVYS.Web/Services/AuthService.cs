@@ -30,6 +30,7 @@ public class AuthService
     {
         try
         {
+            _logger.LogInformation("Login attempt for: {Email} with password length: {Length}", email, password?.Length ?? 0);
             var response = await _httpClient.PostAsJsonAsync("api/v1/auth/login",
                 new { Email = email, Password = password });
 
@@ -82,12 +83,12 @@ public class AuthService
 
     public async Task<UserInfo?> GetCurrentUserAsync()
     {
-        var token = await _localStorage.GetItemAsync<string>("accessToken");
-        if (string.IsNullOrEmpty(token))
-            return null;
-
         try
         {
+            var token = await _localStorage.GetItemAsync<string>("accessToken");
+            if (string.IsNullOrEmpty(token))
+                return null;
+
             var handler = new JwtSecurityTokenHandler();
             var jwtToken = handler.ReadJwtToken(token);
 
@@ -111,6 +112,11 @@ public class AuthService
                 email ?? "",
                 role
             );
+        }
+        catch (InvalidOperationException)
+        {
+            // JavaScript interop not available during prerendering
+            return null;
         }
         catch (Exception ex)
         {
@@ -169,6 +175,11 @@ public class KvysAuthStateProvider : AuthenticationStateProvider
             var principal = new ClaimsPrincipal(identity);
 
             return new AuthenticationState(principal);
+        }
+        catch (InvalidOperationException)
+        {
+            // JavaScript interop not available during prerendering
+            return AnonymousState;
         }
         catch (Exception ex)
         {

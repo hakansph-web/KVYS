@@ -12,7 +12,16 @@ builder.Services.AddRazorComponents()
 // Add Blazored LocalStorage
 builder.Services.AddBlazoredLocalStorage();
 
-// Add Authorization
+// Add Authentication & Authorization
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultScheme = "BlazorServer";
+    options.DefaultChallengeScheme = "BlazorServer";
+}).AddCookie("BlazorServer", options =>
+{
+    options.LoginPath = "/login";
+    options.AccessDeniedPath = "/login";
+});
 builder.Services.AddAuthorizationCore();
 builder.Services.AddCascadingAuthenticationState();
 
@@ -47,6 +56,8 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.UseStaticFiles();
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseAntiforgery();
 
 app.MapRazorComponents<App>()

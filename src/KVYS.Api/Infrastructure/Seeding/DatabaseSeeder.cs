@@ -121,7 +121,8 @@ public class DatabaseSeeder
     {
         // Admin user
         var adminEmail = "admin@kvys.edu.tr";
-        if (await _userManager.FindByEmailAsync(adminEmail) == null)
+        var existingAdmin = await _userManager.FindByEmailAsync(adminEmail);
+        if (existingAdmin == null)
         {
             var admin = new ApplicationUser
             {
@@ -134,7 +135,7 @@ public class DatabaseSeeder
                 IsActive = true
             };
 
-            var result = await _userManager.CreateAsync(admin, "Admin1234!@#");
+            var result = await _userManager.CreateAsync(admin, "Admin123!");
             if (result.Succeeded)
             {
                 await _userManager.AddToRoleAsync(admin, "Sistem Yöneticisi");
@@ -144,6 +145,16 @@ public class DatabaseSeeder
             {
                 _logger.LogError("Failed to create admin user: {Errors}",
                     string.Join(", ", result.Errors.Select(e => $"{e.Code}: {e.Description}")));
+            }
+        }
+        else
+        {
+            // Reset password for existing admin
+            var token = await _userManager.GeneratePasswordResetTokenAsync(existingAdmin);
+            var resetResult = await _userManager.ResetPasswordAsync(existingAdmin, token, "Admin123!");
+            if (resetResult.Succeeded)
+            {
+                _logger.LogInformation("Reset password for admin user: {Email}", adminEmail);
             }
         }
 
